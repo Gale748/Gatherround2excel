@@ -27,10 +27,19 @@ Sub GatherRoundAndExportToExcel()
         Do While .Execute
             aRng.Start = aRng.Paragraphs(1).Range.Start
             
-            ' Add data to Excel worksheet
-            excelRow = excelRow + 1
-            excelWorksheet.Cells(excelRow, 1).Value = aRngHead.ListFormat.ListString & vbTab & aRngHead.Text
-            excelWorksheet.Cells(excelRow, 2).Value = IIf(aRng.ListFormat.ListType = wdListNoNumbering, aRng.FormattedText, aRng.ListFormat.ListString & vbTab & aRng.Text)
+            ' Set aRngHead to the correct range
+            Set aRngHead = aRng.GoToPrevious(wdGoToHeading)
+            If Not aRngHead Is Nothing Then
+                aRngHead.End = aRngHead.Paragraphs(1).Range.End - 1
+            End If
+            
+            ' Check if aRngHead is set before accessing its properties
+            If Not aRngHead Is Nothing Then
+                ' Add data to Excel worksheet
+                excelRow = excelRow + 1
+                excelWorksheet.Cells(excelRow, 1).Value = aRngHead.ListFormat.ListString & vbTab & aRngHead.Text
+                excelWorksheet.Cells(excelRow, 2).Value = IIf(aRng.ListFormat.ListType = wdListNoNumbering, aRng.FormattedText.Text, aRng.ListFormat.ListString & vbTab & aRng.Text)
+            End If
             
             aRng.Collapse Direction:=wdCollapseEnd
             aRng.End = aDoc.Range.End
@@ -39,6 +48,10 @@ Sub GatherRoundAndExportToExcel()
     
     ' Release Excel objects
     Set excelWorksheet = Nothing
+    Set excelWorkbook = Nothing
+    Set excelApp = Nothing
+End Sub
+
     Set excelWorkbook = Nothing
     Set excelApp = Nothing
 End Sub
