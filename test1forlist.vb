@@ -1,4 +1,4 @@
-Sub ExtractListItemsToExcelAfterMarkerOptimized()
+Sub ExtractListItemsToExcelAfterMarker()
     Dim wdApp As Word.Application
     Dim wdDoc As Word.Document
     Dim xlApp As Object
@@ -8,15 +8,20 @@ Sub ExtractListItemsToExcelAfterMarkerOptimized()
     Dim rowNumber As Long
     Dim currentHeading As String
     Dim capture As Boolean
-    Dim aRng As Range, docRange As Range
-    Dim lastFound As Long
     
     Set wdApp = Word.Application
     Set wdDoc = wdApp.ActiveDocument
     
-    ' Create Excel instance
+    ' Attempt to create a new instance of Excel
+    On Error Resume Next
     Set xlApp = CreateObject("Excel.Application")
-    xlApp.Visible = False ' Set to False for performance
+    If xlApp Is Nothing Then
+        MsgBox "Excel is not available."
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    xlApp.Visible = True
     Set xlBook = xlApp.Workbooks.Add
     Set xlSheet = xlBook.Sheets(1)
     
@@ -24,33 +29,34 @@ Sub ExtractListItemsToExcelAfterMarkerOptimized()
     xlSheet.Cells(1, 2).Value = "List Item"
     
     rowNumber = 2
+    currentHeading = ""
     capture = False
-    Set docRange = wdDoc.content
-    lastFound = 0
     
-    ' Loop through document paragraphs
     For Each para In wdDoc.Paragraphs
-        If para.Range.Start >= lastFound Then
-            If InStr(para.Range.Text, "[R]") > 0 Then
-                capture = True
-                ' Find and set the heading using the GoTo method
-                Set aRng = para.Range.GoTo(wdGoToHeading, wdGoToPrevious)
-                If Not aRng Is Nothing Then
-                    currentHeading = aRng.Paragraphs(1).Range.Text
-                    ' Adjust for multi-line headings
-                    If aRng.Paragraphs.Count > 1 Then
-                        Dim i As Long
-                        For i = 2 To aRng.Paragraphs.Count
-                            currentHeading = currentHeading & " " & aRng.Paragraphs(i).Range.Text
-                        Next i
-                    End If
-                    currentHeading = Trim(currentHeading)
-                Else
-                    currentHeading = "No Heading"
-                End If
-                lastFound = para.Range.Start ' Update last found position
-            ElseIf capture And para.Range.ListFormat.listType <> WdListType.wdListNoNumbering Then
-                ' Write heading and list item to Excel
+        ' Adjusted logic to better capture headings with numbering
+        If para.Style Like "Heading*" Then
+            Dim headingNumber As String
+            Dim headingText As String
+            
+            ' Attempt to get the heading's number
+            headingNumber = para.Range.ListFormat.ListString
+            headingText = Trim(para.Range.Text)
+            
+            ' Combine the heading number and text, if the number is available
+            If headingNumber <> "" Then
+                currentHeading = headingNumber & " " & headingText
+            Else
+                currentHeading = headingText
+            End If
+            
+            ' Reset capture flag when a new heading is encountered
+            capture = False
+        ElseIf InStr(para.Range.Text, ": [R]") > 0 Then
+            capture = True
+        ElseIf capture Then
+            ' Check for list items specifically; adjust as needed for your document's structure
+            If para.Range.ListFormat.ListType <> WdListType.wdListNoNumbering Then
+                ' Write captured heading and list item to Excel
                 xlSheet.Cells(rowNumber, 1).Value = currentHeading
                 xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text)
                 rowNumber = rowNumber + 1
@@ -58,12 +64,10 @@ Sub ExtractListItemsToExcelAfterMarkerOptimized()
         End If
     Next para
     
-    ' Final adjustments and cleanup
     xlSheet.Columns("A:B").AutoFit
-    xlApp.Visible = True
     MsgBox "Extraction completed successfully!"
     
-    ' Cleanup
+    ' Clean up
     Set xlSheet = Nothing
     Set xlBook = Nothing
     Set xlApp = Nothing
