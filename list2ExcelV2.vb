@@ -34,18 +34,15 @@ Sub ExtractListItemsToExcelAfterMarker()
     
     For Each para In wdDoc.Paragraphs
         If para.Style Like "Heading*" Then
-            currentHeading = para.Range.Text
-            currentHeading = Trim(currentHeading) ' Ensure the heading text is trimmed
-        End If
-        
-        If InStr(para.Range.Text, ": [R]") > 0 Then
-            capture = True
-            ' Optionally reset currentHeading here if needed, or leave as is to use the last captured heading
-        ElseIf capture And Not para.Range.ListFormat.List Is Nothing Then
-            ' This ensures we're capturing after the marker and the paragraph is a list item
-            xlSheet.Cells(rowNumber, 1).Value = currentHeading
-            xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text)
-            rowNumber = rowNumber + 1
+            currentHeading = Trim(para.Range.Text) ' This should capture the full heading text, including numbering
+        ElseIf InStr(para.Range.Text, ": [R]") > 0 Then
+            capture = True ' Start capturing after the marker
+        ElseIf capture Then
+            If para.Range.ListFormat.ListType <> WdListType.wdListNoNumbering Then
+                xlSheet.Cells(rowNumber, 1).Value = currentHeading ' Use the captured heading
+                xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text) ' List item text
+                rowNumber = rowNumber + 1
+            End If
         End If
     Next para
     
