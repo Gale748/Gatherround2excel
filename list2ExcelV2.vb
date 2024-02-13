@@ -1,6 +1,6 @@
 Sub ExtractListItemsToExcelAfterMarker()
-    Dim wdApp As Word.Application
-    Dim wdDoc As Word.Document
+    Dim wdApp As Object
+    Dim wdDoc As Object
     Dim xlApp As Object
     Dim xlBook As Object
     Dim xlSheet As Object
@@ -9,7 +9,7 @@ Sub ExtractListItemsToExcelAfterMarker()
     Dim currentHeading As String
     Dim capture As Boolean
     
-    Set wdApp = Word.Application
+    Set wdApp = CreateObject("Word.Application")
     Set wdDoc = wdApp.ActiveDocument
     
     ' Attempt to create a new instance of Excel
@@ -23,7 +23,7 @@ Sub ExtractListItemsToExcelAfterMarker()
     
     xlApp.Visible = True
     Set xlBook = xlApp.Workbooks.Add
-    Set xlSheet = xlBook.Sheets(1)
+    Set xlSheet = xlBook.Worksheets(1)
     
     xlSheet.Cells(1, 1).Value = "Heading Name"
     xlSheet.Cells(1, 2).Value = "List Item"
@@ -33,22 +33,20 @@ Sub ExtractListItemsToExcelAfterMarker()
     capture = False
     
     For Each para In wdDoc.Paragraphs
-        ' Adjusted logic to better capture headings
         If para.Style Like "Heading*" Then
-            ' Assuming the heading includes any numbering, this will capture it
+            ' Capture the heading text including the section number if it's part of the text
             currentHeading = Trim(para.Range.Text)
-            ' Check if the marker to start capture has been reached
-            If Not capture AndAlso InStr(para.Range.Text, ": [R]") > 0 Then
-                capture = True
-            End If
-        ElseIf capture Then
+        End If
+        
+        If InStr(para.Range.Text, ": [R]") > 0 Then
+            capture = True
+            ' Reset the heading to ensure it's ready to capture under the new section
+            currentHeading = Trim(para.Range.Text)
+        ElseIf capture And Not para.Range.ListFormat.List Is Nothing Then
             ' Check for list items specifically; adjust as needed for your document's structure
-            If Not para.Range.ListFormat.List Is Nothing Then
-                ' Write captured heading and list item to Excel
-                xlSheet.Cells(rowNumber, 1).Value = currentHeading
-                xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text)
-                rowNumber = rowNumber + 1
-            End If
+            xlSheet.Cells(rowNumber, 1).Value = currentHeading
+            xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text)
+            rowNumber = rowNumber + 1
         End If
     Next para
     
