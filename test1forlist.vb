@@ -8,6 +8,7 @@ Sub ExtractListItemsToExcelAfterMarker()
     Dim rowNumber As Long
     Dim currentHeading As String
     Dim capture As Boolean
+    Dim aRngHead As Range ' New variable for capturing the heading
     
     Set wdApp = Word.Application
     Set wdDoc = wdApp.ActiveDocument
@@ -32,22 +33,28 @@ Sub ExtractListItemsToExcelAfterMarker()
     currentHeading = ""
     capture = False
     
-   For Each para In wdDoc.Paragraphs
-    If para.Style Like "Heading*" Then
-        ' Always update the current heading with the latest heading encountered
-        currentHeading = Trim(para.Range.Text)
-    ElseIf InStr(para.Range.Text, ": [R]") > 0 Then
-        capture = True
-    ElseIf capture Then
-        If para.Range.ListFormat.ListType <> WdListType.wdListNoNumbering Then
-            ' Write captured heading and list item to Excel, now with accurate heading data
-            xlSheet.Cells(rowNumber, 1).Value = currentHeading
-            xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text)
-            rowNumber = rowNumber + 1
+    For Each para In wdDoc.Paragraphs
+        If para.Range.Text Like "*: [R]*" Then
+            capture = True
+            ' Use GoToPrevious to find the heading related to the marked text
+            Set aRngHead = para.Range.GoToPrevious(wdGoToHeading)
+            If Not aRngHead Is Nothing Then
+                aRngHead.End = aRngHead.Paragraphs(1).Range.End - 1
+                currentHeading = Trim(aRngHead.Text)
+            Else
+                currentHeading = "No Heading"
+            End If
+        ElseIf capture Then
+            ' Check for list items specifically; adjust as needed for your document's structure
+            If para.Range.ListFormat.ListType <> WdListType.wdListNoNumbering Then
+                ' Write captured heading and list item to Excel
+                xlSheet.Cells(rowNumber, 1).Value = currentHeading
+                xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text)
+                rowNumber = rowNumber + 1
+            End If
         End If
-    End If
-Next para
-
+    Next para
+    
     xlSheet.Columns("A:B").AutoFit
     MsgBox "Extraction completed successfully!"
     
