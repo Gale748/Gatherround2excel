@@ -1,6 +1,6 @@
 Sub ExtractListItemsToExcelAfterMarker()
-    Dim wdApp As Object
-    Dim wdDoc As Object
+    Dim wdApp As Word.Application
+    Dim wdDoc As Word.Document
     Dim xlApp As Object
     Dim xlBook As Object
     Dim xlSheet As Object
@@ -9,7 +9,7 @@ Sub ExtractListItemsToExcelAfterMarker()
     Dim currentHeading As String
     Dim capture As Boolean
     
-    Set wdApp = CreateObject("Word.Application")
+    Set wdApp = Word.Application
     Set wdDoc = wdApp.ActiveDocument
     
     ' Attempt to create a new instance of Excel
@@ -23,7 +23,7 @@ Sub ExtractListItemsToExcelAfterMarker()
     
     xlApp.Visible = True
     Set xlBook = xlApp.Workbooks.Add
-    Set xlSheet = xlBook.Worksheets(1)
+    Set xlSheet = xlBook.Sheets(1)
     
     xlSheet.Cells(1, 1).Value = "Heading Name"
     xlSheet.Cells(1, 2).Value = "List Item"
@@ -34,16 +34,15 @@ Sub ExtractListItemsToExcelAfterMarker()
     
     For Each para In wdDoc.Paragraphs
         If para.Style Like "Heading*" Then
-            ' Capture the heading text including the section number if it's part of the text
-            currentHeading = Trim(para.Range.Text)
+            currentHeading = para.Range.Text
+            currentHeading = Trim(currentHeading) ' Ensure the heading text is trimmed
         End If
         
         If InStr(para.Range.Text, ": [R]") > 0 Then
             capture = True
-            ' Reset the heading to ensure it's ready to capture under the new section
-            currentHeading = Trim(para.Range.Text)
+            ' Optionally reset currentHeading here if needed, or leave as is to use the last captured heading
         ElseIf capture And Not para.Range.ListFormat.List Is Nothing Then
-            ' Check for list items specifically; adjust as needed for your document's structure
+            ' This ensures we're capturing after the marker and the paragraph is a list item
             xlSheet.Cells(rowNumber, 1).Value = currentHeading
             xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text)
             rowNumber = rowNumber + 1
