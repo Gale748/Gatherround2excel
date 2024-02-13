@@ -1,4 +1,4 @@
-Sub ExtractListItemsToExcelAfterMarker()
+Sub ExtractListItemsToExcelAfterMarkerOptimized()
     Dim wdApp As Word.Application
     Dim wdDoc As Word.Document
     Dim xlApp As Object
@@ -8,21 +8,15 @@ Sub ExtractListItemsToExcelAfterMarker()
     Dim rowNumber As Long
     Dim currentHeading As String
     Dim capture As Boolean
-    Dim aRngHead As Range ' New variable for capturing the heading
+    Dim aRng As Range, docRange As Range
+    Dim lastFound As Long
     
     Set wdApp = Word.Application
     Set wdDoc = wdApp.ActiveDocument
     
-    ' Attempt to create a new instance of Excel
-    On Error Resume Next
+    ' Create Excel instance
     Set xlApp = CreateObject("Excel.Application")
-    If xlApp Is Nothing Then
-        MsgBox "Excel is not available."
-        Exit Sub
-    End If
-    On Error GoTo 0
-    
-    xlApp.Visible = True
+    xlApp.Visible = False ' Set to False for performance
     Set xlBook = xlApp.Workbooks.Add
     Set xlSheet = xlBook.Sheets(1)
     
@@ -30,24 +24,33 @@ Sub ExtractListItemsToExcelAfterMarker()
     xlSheet.Cells(1, 2).Value = "List Item"
     
     rowNumber = 2
-    currentHeading = ""
     capture = False
+    Set docRange = wdDoc.content
+    lastFound = 0
     
+    ' Loop through document paragraphs
     For Each para In wdDoc.Paragraphs
-        If para.Range.Text Like "*: [R]*" Then
-            capture = True
-            ' Use GoToPrevious to find the heading related to the marked text
-            Set aRngHead = para.Range.GoToPrevious(wdGoToHeading)
-            If Not aRngHead Is Nothing Then
-                aRngHead.End = aRngHead.Paragraphs(1).Range.End - 1
-                currentHeading = Trim(aRngHead.Text)
-            Else
-                currentHeading = "No Heading"
-            End If
-        ElseIf capture Then
-            ' Check for list items specifically; adjust as needed for your document's structure
-            If para.Range.ListFormat.ListType <> WdListType.wdListNoNumbering Then
-                ' Write captured heading and list item to Excel
+        If para.Range.Start >= lastFound Then
+            If InStr(para.Range.Text, "[R]") > 0 Then
+                capture = True
+                ' Find and set the heading using the GoTo method
+                Set aRng = para.Range.GoTo(wdGoToHeading, wdGoToPrevious)
+                If Not aRng Is Nothing Then
+                    currentHeading = aRng.Paragraphs(1).Range.Text
+                    ' Adjust for multi-line headings
+                    If aRng.Paragraphs.Count > 1 Then
+                        Dim i As Long
+                        For i = 2 To aRng.Paragraphs.Count
+                            currentHeading = currentHeading & " " & aRng.Paragraphs(i).Range.Text
+                        Next i
+                    End If
+                    currentHeading = Trim(currentHeading)
+                Else
+                    currentHeading = "No Heading"
+                End If
+                lastFound = para.Range.Start ' Update last found position
+            ElseIf capture And para.Range.ListFormat.listType <> WdListType.wdListNoNumbering Then
+                ' Write heading and list item to Excel
                 xlSheet.Cells(rowNumber, 1).Value = currentHeading
                 xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text)
                 rowNumber = rowNumber + 1
@@ -55,10 +58,12 @@ Sub ExtractListItemsToExcelAfterMarker()
         End If
     Next para
     
+    ' Final adjustments and cleanup
     xlSheet.Columns("A:B").AutoFit
+    xlApp.Visible = True
     MsgBox "Extraction completed successfully!"
     
-    ' Clean up
+    ' Cleanup
     Set xlSheet = Nothing
     Set xlBook = Nothing
     Set xlApp = Nothing
