@@ -33,14 +33,23 @@ Sub ExtractListItemsToExcelAfterMarker()
     capture = False
     
     For Each para In wdDoc.Paragraphs
+        ' Adjusted logic to better capture headings
         If para.Style Like "Heading*" Then
-            currentHeading = Trim(para.Range.Text) ' This should capture the full heading text, including numbering
+            If capture Then
+                ' If already capturing, update heading for new sections after capture starts
+                currentHeading = Trim(para.Range.Text)
+            Else
+                ' Store heading to use once capture starts
+                currentHeading = Trim(para.Range.Text)
+            End If
         ElseIf InStr(para.Range.Text, ": [R]") > 0 Then
-            capture = True ' Start capturing after the marker
+            capture = True
         ElseIf capture Then
+            ' Check for list items specifically; adjust as needed for your document's structure
             If para.Range.ListFormat.ListType <> WdListType.wdListNoNumbering Then
-                xlSheet.Cells(rowNumber, 1).Value = currentHeading ' Use the captured heading
-                xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text) ' List item text
+                ' Write captured heading and list item to Excel
+                xlSheet.Cells(rowNumber, 1).Value = currentHeading
+                xlSheet.Cells(rowNumber, 2).Value = Trim(para.Range.Text)
                 rowNumber = rowNumber + 1
             End If
         End If
