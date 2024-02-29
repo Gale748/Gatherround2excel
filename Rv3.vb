@@ -1,70 +1,80 @@
-Sub GatherRTagsWithHashesFinalVersion()
+Sub GatherRTagsWithHashesOptimizedAndErrorHandled()
     On Error GoTo ErrorHandler
 
-    ' Constants for search text and column titles
+    ' Define constants for search text and column titles
     Const SearchTextR As String = "[R]"
     Const HeadingColumnTitle As String = "Heading"
     Const TextColumnTitle As String = "Text"
-    
+
     Dim srcDoc As Document
     Dim xlApp As Object, xlBook As Object, xlSheet As Object
-    Dim lastHeadingText As String, currentHeadingText As String
+    Dim currentHeadingText As String
     Dim aRng As Range, aRngHead As Range
-    Dim iRow As Long
-    
+    Dim iRow As Long, documentEnd As Long
+
     Set srcDoc = ActiveDocument
+    ' Create a new Excel instance and add a workbook
     Set xlApp = CreateObject("Excel.Application")
     Set xlBook = xlApp.Workbooks.Add
     Set xlSheet = xlBook.Worksheets(1)
-    
+
     xlApp.Visible = True ' Excel visibility for debugging
-    
+
+    ' Add column titles to the first row in Excel
     xlSheet.Cells(1, 1).Value = HeadingColumnTitle
     xlSheet.Cells(1, 2).Value = TextColumnTitle
-    iRow = 2 ' Starting row for data
-    
+    iRow = 2 ' Start from the second row for data
+
     Set aRng = srcDoc.Range
-    
+    documentEnd = srcDoc.Content.End
+
     With aRng.Find
         .ClearFormatting
         .Text = SearchTextR
         .Forward = True
         .Wrap = wdFindStop
         Do While .Execute
-            ' Move to start of the paragraph to ensure complete capture
+            ' Extend the range to capture following '#' characters, accounting for possible whitespace
+            Dim extendedRange As Range
+            Set extendedRange = aRng.Duplicate
+            extendedRange.MoveEndWhile Cset:=" ", Count:=wdForward
+            extendedRange.MoveEndUntil Cset:="#", Count:=wdForward
+            extendedRange.Expand Unit:=wdParagraph
+
+            If InStr(extendedRange.Text, "#") > 0 Then
+                aRng.SetRange Start:=aRng.Start, End:=extendedRange.End
+            End If
+
+            ' Retrieve heading
             aRng.Start = aRng.Paragraphs(1).Range.Start
-            
-            ' Capture the heading text as in the original script
-            Set aRngHead = aRng.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
+            Set aRngHead = aRng.GoTo(wdGoToHeading, wdGoToPrevious)
             If Not aRngHead Is Nothing Then
-                ' This captures the entire heading text, including numbering if present
+                ' Directly use the heading text, ensuring formatting and numbering are preserved
                 currentHeadingText = aRngHead.Text
                 If Right(currentHeadingText, 1) = vbCr Then
-                    currentHeadingText = Left(currentHeadingText, Len(currentHeadingText) - 1) ' Remove trailing carriage return
+                    currentHeadingText = Left(currentHeadingText, Len(currentHeadingText) - 1) ' Remove trailing carriage return for clean text
                 End If
             Else
-                currentHeadingText = "No Heading" ' Fallback if no heading is found
+                currentHeadingText = "No Heading"
             End If
-            
-            ' Avoid duplicates by checking if the heading has changed
-            If currentHeadingText <> lastHeadingText Then
-                lastHeadingText = currentHeadingText
-            End If
-            
+
             ' Insert data into Excel
-            xlSheet.Cells(iRow, 1).Value = Trim(currentHeadingText)
+            xlSheet.Cells(iRow, 1).Value = currentHeadingText
             xlSheet.Cells(iRow, 2).Value = Trim(aRng.Text)
-            
+
             iRow = iRow + 1 ' Prepare for the next row
             aRng.Collapse Direction:=wdCollapseEnd
+
+            ' Break loop if at the end of the document
+            If aRng.Start >= documentEnd Then Exit Do
         Loop
     End With
-    
-    ' AutoFit Excel columns for a better appearance
+
+    ' Optimize Excel appearance
     xlSheet.Columns("A:B").AutoFit
     xlApp.Visible = True ' Make sure Excel is visible after processing
     Exit Sub
-    
+
 ErrorHandler:
     MsgBox "An error has occurred: " & Err.Description
     xlApp.Visible = True ' Ensure Excel is visible if an error occurs
