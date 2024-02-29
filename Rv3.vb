@@ -8,7 +8,7 @@ Sub GatherRTagsWithHashesOptimizedAndErrorHandled()
 
     Dim srcDoc As Document
     Dim xlApp As Object, xlBook As Object, xlSheet As Object
-    Dim currentHeadingText As String
+    Dim lastHeadingText As String, currentHeadingText As String
     Dim aRng As Range, aRngHead As Range
     Dim iRow As Long, documentEnd As Long
 
@@ -49,11 +49,7 @@ Sub GatherRTagsWithHashesOptimizedAndErrorHandled()
             aRng.Start = aRng.Paragraphs(1).Range.Start
             Set aRngHead = aRng.GoTo(wdGoToHeading, wdGoToPrevious)
             If Not aRngHead Is Nothing Then
-                ' Directly use the heading text, ensuring formatting and numbering are preserved
-                currentHeadingText = aRngHead.Text
-                If Right(currentHeadingText, 1) = vbCr Then
-                    currentHeadingText = Left(currentHeadingText, Len(currentHeadingText) - 1) ' Remove trailing carriage return for clean text
-                End If
+                currentHeadingText = aRngHead.ListFormat.ListString & vbTab & Trim(aRngHead.Text)
             Else
                 currentHeadingText = "No Heading"
             End If
