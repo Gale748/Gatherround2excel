@@ -1,4 +1,4 @@
-Sub ListRTagsWithSubsequentTagsAndHeadings()
+Sub ListRTagsWithSubsequentTagsAndHeadingsEnhanced()
     ' Tags to check for after [R]
     Dim subsequentTags As Variant
     subsequentTags = Array("#SPM", "#SPAM", "#TechLead", "#RSM")
@@ -31,7 +31,7 @@ Sub ListRTagsWithSubsequentTagsAndHeadings()
             Set headingRange = para.Range.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
             Dim headingText As String
             If Not headingRange Is Nothing Then
-                headingText = headingRange.Paragraphs(1).Range.Text
+                headingText = Trim(headingRange.Paragraphs(1).Range.Text)
                 If Right(headingText, 1) = Chr(13) Then ' Remove trailing carriage return
                     headingText = Left(headingText, Len(headingText) - 1)
                 End If
@@ -41,7 +41,7 @@ Sub ListRTagsWithSubsequentTagsAndHeadings()
             
             ' Output to Excel
             xlSheet.Cells(iRow, 1).Value = headingText
-            xlSheet.Cells(iRow, 2).Value = para.Range.Text ' Place paragraph text
+            xlSheet.Cells(iRow, 2).Value = Trim(para.Range.Text) ' Place paragraph text
             
             ' Check for each specified subsequent tag within the same paragraph
             For i = 0 To UBound(subsequentTags)
