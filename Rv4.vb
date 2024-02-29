@@ -25,43 +25,36 @@ Sub GatherRTagsWithEnhancedHeadingAndTextExtraction()
     
     Set aRng = srcDoc.Range
     
-    With aRng.Find
-        .ClearFormatting
-        .Text = SearchTextR
-        .Forward = True
-        Do While .Execute
-            ' Extend range to capture following '#' characters, accounting for possible whitespace
-            Dim extendedRange As Range
-            Set extendedRange = aRng.Duplicate
-            extendedRange.MoveEndWhile Cset:=" ", Count:=wdForward
-            extendedRange.MoveEndUntil Cset:="#", Count:=wdForward
-            extendedRange.Expand Unit:=wdParagraph
-            
-            ' Move to start of the paragraph to ensure complete capture
-            aRng.Start = aRng.Paragraphs(1).Range.Start
-            
-            ' Retrieve heading using the original method for accuracy
-            Set aRngHead = aRng.GoTo(wdGoToHeading, wdGoToPrevious)
-            If Not aRngHead Is Nothing Then
-                currentHeadingText = Trim(aRngHead.Text)
-                If Right(currentHeadingText, 1) = vbCr Then
-                    currentHeadingText = Left(currentHeadingText, Len(currentHeadingText) - 1) ' Remove trailing carriage return
-                End If
-            Else
-                currentHeadingText = "No Heading"
+    Do While aRng.Find.Execute(FindText:=SearchTextR, Forward:=True)
+        ' Extend range to capture following '#' characters, accounting for possible whitespace
+        Dim extendedRange As Range
+        Set extendedRange = aRng.Duplicate
+        extendedRange.MoveEndWhile Cset:=" ", Count:=wdForward
+        extendedRange.MoveEndUntil Cset:="#", Count:=wdForward
+        extendedRange.Expand Unit:=wdParagraph
+        
+        ' Retrieve heading using the original method for accuracy
+        Set aRngHead = aRng.GoTo(wdGoToHeading, wdGoToPrevious)
+        If Not aRngHead Is Nothing Then
+            currentHeadingText = Trim(aRngHead.Text)
+            If Right(currentHeadingText, 1) = vbCr Then
+                currentHeadingText = Left(currentHeadingText, Len(currentHeadingText) - 1) ' Remove trailing carriage return
             End If
-            
-            ' Insert data into Excel
-            xlSheet.Cells(iRow, 1).Value = currentHeadingText
-            xlSheet.Cells(iRow, 2).Value = Trim(aRng.Text)
-            
-            iRow = iRow + 1 ' Prepare for the next row
-            aRng.Collapse Direction:=wdCollapseEnd
-            
-            ' Ensure we move beyond the current `[R]` tag to avoid duplicate captures
-            aRng.Start = extendedRange.End + 1
-        Loop Until aRng.Start >= srcDoc.Content.End
-    End With
+        Else
+            currentHeadingText = "No Heading"
+        End If
+        
+        ' Insert data into Excel
+        xlSheet.Cells(iRow, 1).Value = currentHeadingText
+        xlSheet.Cells(iRow, 2).Value = Trim(aRng.Text)
+        
+        iRow = iRow + 1 ' Prepare for the next row
+        aRng.Collapse Direction:=wdCollapseEnd
+        
+        ' Ensure we move beyond the current `[R]` tag to avoid duplicate captures
+        aRng.Start = extendedRange.End + 1
+        If aRng.Start >= srcDoc.Content.End Then Exit Do
+    Loop
     
     ' Optimize Excel appearance
     xlSheet.Columns("A:B").AutoFit
