@@ -1,26 +1,27 @@
-Sub GatherRTagsMissingHashTagsOptimized()
-    ' Constants for search text and column titles
+Sub GatherRTagsWithFollowingHashTags()
+    ' Define constants for search text and column titles for maintainability
     Const SearchTextR As String = "[R]"
-    Const HashTag As String = "#"
     Const HeadingColumnTitle As String = "Heading"
-    Const TextColumnTitle As String = "Instance Detail"
+    Const TextColumnTitle As String = "Following Tags"
     
     Dim srcDoc As Document
     Dim xlApp As Object, xlBook As Object, xlSheet As Object
-    Dim aRng As Range, aRngHead As Range, checkRange As Range
+    Dim currentHeadingText As String
+    Dim aRng As Range, aRngHead As Range, textRng As Range
     Dim iRow As Long
     
     Set srcDoc = ActiveDocument
+    ' Create a new Excel instance and add a workbook
     Set xlApp = CreateObject("Excel.Application")
     Set xlBook = xlApp.Workbooks.Add
     Set xlSheet = xlBook.Worksheets(1)
     
-    xlApp.Visible = True ' For debugging
+    xlApp.Visible = True ' Excel visibility for debugging
     
-    ' Add column titles
+    ' Add column titles to the first row in Excel
     xlSheet.Cells(1, 1).Value = HeadingColumnTitle
     xlSheet.Cells(1, 2).Value = TextColumnTitle
-    iRow = 2 ' Start data from the second row
+    iRow = 2 ' Start from the second row for data
     
     Set aRng = srcDoc.Range
     
@@ -28,42 +29,37 @@ Sub GatherRTagsMissingHashTagsOptimized()
         .Text = SearchTextR
         .Forward = True
         .Wrap = wdFindStop
-        .Format = False
-        .MatchCase = False
-        .MatchWholeWord = False
-        .MatchWildcards = False
-        .MatchSoundsLike = False
-        .MatchAllWordForms = False
-        
         Do While .Execute
-            ' Check for '#' following '[R]'
-            Set checkRange = srcDoc.Range(Start:=aRng.End, End:=aRng.End + 1)
-            checkRange.MoveEnd wdCharacter, 1
-            checkRange.Expand wdWord
+            ' Extend the range to the end of the paragraph to capture potential #'s
+            Set textRng = srcDoc.Range(aRng.Start, aRng.Paragraphs(1).Range.End)
             
-            ' If no '#' is found immediately after '[R]', capture the instance
-            If Not checkRange.Text Like HashTag & "*" Then
-                ' Find and set the heading related to the [R] tag
+            ' Check if there are any # tags immediately following [R]
+            If InStr(textRng.Text, "#") > 0 Then
+                ' Retrieve heading for the [R] tag
                 Set aRngHead = aRng.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
                 If Not aRngHead Is Nothing Then
-                    xlSheet.Cells(iRow, 1).Value = Trim(aRngHead.Text)
+                    currentHeadingText = Trim(aRngHead.Text)
+                    If Right(currentHeadingText, 1) = Chr(13) Then ' Remove trailing carriage return
+                        currentHeadingText = Left(currentHeadingText, Len(currentHeadingText) - 1)
+                    End If
                 Else
-                    xlSheet.Cells(iRow, 1).Value = "No Heading"
+                    currentHeadingText = "No Heading"
                 End If
                 
-                xlSheet.Cells(iRow, 2).Value = aRng.Text
+                ' Insert data into Excel
+                xlSheet.Cells(iRow, 1).Value = currentHeadingText
+                xlSheet.Cells(iRow, 2).Value = Trim(textRng.Text)
                 
-                iRow = iRow + 1 ' Move to the next row for the next entry
+                iRow = iRow + 1 ' Prepare for the next row
             End If
             
             ' Move the search range forward to continue the search
-            aRng.SetRange Start:=checkRange.End, End:=srcDoc.Content.End
+            aRng.Start = textRng.End
+            aRng.End = srcDoc.Content.End
         Loop
     End With
     
-    ' Auto-fit columns for better visibility
+    ' Optimize Excel appearance
     xlSheet.Columns("A:B").AutoFit
-    
-    ' Ensure Excel is visible after processing
-    xlApp.Visible = True
+    xlApp.Visible = True ' Make sure Excel is visible after processing
 End Sub
