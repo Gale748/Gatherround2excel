@@ -1,68 +1,69 @@
-Sub GatherRTagsWithCorrectHeadingAndTextExtraction()
+Sub GatherRTagsMissingHashTagsOptimized()
     ' Constants for search text and column titles
     Const SearchTextR As String = "[R]"
+    Const HashTag As String = "#"
     Const HeadingColumnTitle As String = "Heading"
-    Const TextColumnTitle As String = "Text"
+    Const TextColumnTitle As String = "Instance Detail"
     
     Dim srcDoc As Document
     Dim xlApp As Object, xlBook As Object, xlSheet As Object
-    Dim currentHeadingText As String, lastHeadingText As String
-    Dim aRng As Range, aRngHead As Range
+    Dim aRng As Range, aRngHead As Range, checkRange As Range
     Dim iRow As Long
     
     Set srcDoc = ActiveDocument
-    ' Create a new Excel instance and add a workbook
     Set xlApp = CreateObject("Excel.Application")
     Set xlBook = xlApp.Workbooks.Add
     Set xlSheet = xlBook.Worksheets(1)
     
-    xlApp.Visible = True ' Make Excel visible for debugging
+    xlApp.Visible = True ' For debugging
     
-    ' Add column titles to the first row in Excel
+    ' Add column titles
     xlSheet.Cells(1, 1).Value = HeadingColumnTitle
     xlSheet.Cells(1, 2).Value = TextColumnTitle
-    iRow = 2 ' Initialize row counter for data entry
+    iRow = 2 ' Start data from the second row
     
     Set aRng = srcDoc.Range
     
-    ' Clear last heading text for comparison
-    lastHeadingText = ""
-    
-    Do While aRng.Find.Execute(FindText:=SearchTextR, Forward:=True)
-        ' Capture the paragraph where [R] is found
-        Dim paraRange As Range
-        Set paraRange = aRng.Paragraphs(1).Range
+    With aRng.Find
+        .Text = SearchTextR
+        .Forward = True
+        .Wrap = wdFindStop
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
         
-        ' Retrieve heading
-        Set aRngHead = paraRange.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
-        If Not aRngHead Is Nothing Then
-            currentHeadingText = aRngHead.Text
-            If Right(currentHeadingText, 1) = Chr(13) Then ' Remove trailing carriage return
-                currentHeadingText = Left(currentHeadingText, Len(currentHeadingText) - 1)
-            End If
-        Else
-            currentHeadingText = "No Heading"
-        End If
-        
-        ' Check if the heading text has changed to avoid duplication
-        If currentHeadingText <> lastHeadingText Or (currentHeadingText = lastHeadingText And aRng.Text <> srcDoc.Range(lastHeadingText).Text) Then
-            ' Insert data into Excel
-            xlSheet.Cells(iRow, 1).Value = currentHeadingText
-            xlSheet.Cells(iRow, 2).Value = Trim(paraRange.Text)
+        Do While .Execute
+            ' Check for '#' following '[R]'
+            Set checkRange = srcDoc.Range(Start:=aRng.End, End:=aRng.End + 1)
+            checkRange.MoveEnd wdCharacter, 1
+            checkRange.Expand wdWord
             
-            iRow = iRow + 1 ' Increment row counter for next entry
-            lastHeadingText = currentHeadingText ' Update last heading text for comparison
-        End If
-        
-        ' Move range to the end of the current paragraph to continue search
-        aRng.Start = paraRange.End
-        aRng.End = srcDoc.Content.End
-        
-        ' Exit condition if the end of the document is reached
-        If aRng.Start >= srcDoc.Content.End Then Exit Do
-    Loop
+            ' If no '#' is found immediately after '[R]', capture the instance
+            If Not checkRange.Text Like HashTag & "*" Then
+                ' Find and set the heading related to the [R] tag
+                Set aRngHead = aRng.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
+                If Not aRngHead Is Nothing Then
+                    xlSheet.Cells(iRow, 1).Value = Trim(aRngHead.Text)
+                Else
+                    xlSheet.Cells(iRow, 1).Value = "No Heading"
+                End If
+                
+                xlSheet.Cells(iRow, 2).Value = aRng.Text
+                
+                iRow = iRow + 1 ' Move to the next row for the next entry
+            End If
+            
+            ' Move the search range forward to continue the search
+            aRng.SetRange Start:=checkRange.End, End:=srcDoc.Content.End
+        Loop
+    End With
     
-    ' Optimize Excel appearance
+    ' Auto-fit columns for better visibility
     xlSheet.Columns("A:B").AutoFit
-    xlApp.Visible = True ' Keep Excel visible after processing
+    
+    ' Ensure Excel is visible after processing
+    xlApp.Visible = True
 End Sub
