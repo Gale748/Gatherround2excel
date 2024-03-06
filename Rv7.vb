@@ -56,16 +56,23 @@ Sub ListRTagsWithSubsequentTagsAndCaptureHeadings()
             xlSheet.Cells(iRow, 1).Value = currentHeadingText
             xlSheet.Cells(iRow, 2).Value = Trim(aRng.Text) ' Place [R] tag text
             
-            ' Modified part: Check for each specified subsequent tag within the text following [R] in the same paragraph
+            ' Extract text following the [R] marker in the paragraph
             Dim postRText As String
             Dim posR As Integer
-            
-            ' Extract text following the [R] marker in the paragraph
             posR = InStr(aRng.Text, "[R]") + Len("[R]") ' Find position right after [R]
             postRText = Mid(aRng.Text, posR) ' Get text after [R] in the same paragraph
+            postRText = Trim(postRText) ' Trim any leading or trailing spaces
+            
+            ' Check for each specified subsequent tag within the text following [R] in the same paragraph
+            Dim tagFound As Boolean ' Flag to check if tag is found
             
             For i = 0 To UBound(subsequentTags)
-                If InStr(postRText, subsequentTags(i)) > 0 Then
+                tagFound = False ' Reset flag for each subsequentTag
+                If InStr(1, postRText & " ", subsequentTags(i) & " ", vbTextCompare) > 0 Then
+                    tagFound = True ' Tag is found
+                End If
+                
+                If tagFound Then
                     xlSheet.Cells(iRow, i + 3).Value = "Yes"
                 Else
                     xlSheet.Cells(iRow, i + 3).Value = "No"
