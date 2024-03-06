@@ -1,107 +1,71 @@
 Sub ListRTagsWithSubsequentTagsAndCaptureHeadings()
-    ' Tags to check for after [R]
+    ' Define the tags to look for after [R]
     Dim subsequentTags As Variant
     subsequentTags = Array("#SPM", "#SPAM", "#TechLead", "#RSM")
     
-    ' Excel setup
+    ' Setup Excel
     Dim xlApp As Object, xlBook As Object, xlSheet As Object
     Set xlApp = CreateObject("Excel.Application")
+    xlApp.Visible = True
     Set xlBook = xlApp.Workbooks.Add
     Set xlSheet = xlBook.Worksheets(1)
-    xlApp.Visible = True ' Make Excel visible
     
-    ' Column titles in Excel
+    ' Setup column titles in Excel
     xlSheet.Cells(1, 1).Value = "Heading"
     xlSheet.Cells(1, 2).Value = "Paragraph Containing [R]"
+    Dim i As Integer
     For i = 0 To UBound(subsequentTags)
         xlSheet.Cells(1, i + 3).Value = "Contains " & subsequentTags(i) & "?"
     Next i
     
-    ' Document setup
+    ' Initialize Word document variables
     Dim srcDoc As Document
     Set srcDoc = ActiveDocument
-    Dim iRow As Long: iRow = 2 ' Start from the second row for data
-    
     Dim aRng As Range, aRngHead As Range
-    Dim lastHeadingText As String, currentHeadingText As String
-    Dim lastHeadingPosition As Long
+    Dim lastHeadingText As String: lastHeadingText = ""
+    Dim currentHeadingText As String: currentHeadingText = ""
+    Dim iRow As Long: iRow = 2 ' Start entering data from the second row
     
     Set aRng = srcDoc.Range
-    lastHeadingPosition = 0 ' Initialize last heading position
-    
-    ' Regular expression setup for detecting tags
-    Dim regex As Object
-    Set regex = CreateObject("VBScript.RegExp")
-    Dim match As Object
-    
-    ' Prepare the regular expression to find tags
-    regex.Global = True
-    regex.IgnoreCase = True
-    regex.Pattern = "#(SPM|SPAM|TechLead|RSM)\b"
     
     With aRng.Find
         .Text = "[R]"
         .Forward = True
         .Wrap = wdFindStop
         Do While .Execute
+            ' Reset range to start of paragraph to capture the heading
             aRng.Start = aRng.Paragraphs(1).Range.Start
+            Set aRngHead = aRng.Paragraphs(1).Range.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
             
-            If aRng.Start >= lastHeadingPosition Then
-                ' Retrieve heading only if we've moved past the last heading position
-                Set aRngHead = aRng.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
-                If Not aRngHead Is Nothing Then
-                    aRngHead.End = aRngHead.Paragraphs(1).Range.End - 1
-                    currentHeadingText = Trim(aRngHead.ListFormat.ListString & " " & aRngHead.Text)
-                    
-                    If currentHeadingText <> lastHeadingText Then
-                        lastHeadingText = currentHeadingText
-                        lastHeadingPosition = aRngHead.Start ' Update last heading position
-                    End If
-                Else
-                    currentHeadingText = "No Heading"
-                End If
+            If Not aRngHead Is Nothing Then
+                currentHeadingText = Trim(aRngHead.Text)
+            Else
+                currentHeadingText = "No Heading"
             End If
             
-            ' Output to Excel
+            ' Write the current heading and paragraph containing [R] to Excel
             xlSheet.Cells(iRow, 1).Value = currentHeadingText
-            xlSheet.Cells(iRow, 2).Value = Trim(aRng.Text) ' Place [R] tag text
+            xlSheet.Cells(iRow, 2).Value = Trim(aRng.Text)
             
-            ' Extract text following the [R] marker in the paragraph and apply regex
+            ' Extract text following [R] and check for subsequent tags
             Dim postRText As String
-            Dim posR As Integer
-            posR = InStr(aRng.Text, "[R]") + Len("[R]") ' Find position right after [R]
-            postRText = Mid(aRng.Text, posR) ' Get text after [R] in the same paragraph
+            postRText = Mid(aRng.Text, InStr(aRng.Text, "[R]") + Len("[R]"))
             
-            ' Use RegEx to find matches in the postRText and output to Excel
-            Dim matches As Object
-            Set matches = regex.Execute(postRText)
-            
-            ' Initialize tag presence checks
-            Dim tagPresence(UBound(subsequentTags)) As Boolean
-            
-            For Each match In matches
-                For i = 0 To UBound(subsequentTags)
-                    If StrComp(match.Value, subsequentTags(i), vbTextCompare) = 0 Then
-                        tagPresence(i) = True
-                        Exit For
-                    End If
-                Next i
-            Next
-            
-            ' Output to Excel based on tag presence
-            For i = 0 To UBound(subsequentTags)
-                If tagPresence(i) Then
-                    xlSheet.Cells(iRow, i + 3).Value = "Yes"
+            ' Check for each tag
+            For j = 0 To UBound(subsequentTags)
+                If InStr(1, postRText, subsequentTags(j), vbTextCompare) > 0 Then
+                    xlSheet.Cells(iRow, j + 3).Value = "Yes"
                 Else
-                    xlSheet.Cells(iRow, i + 3).Value = "No"
+                    xlSheet.Cells(iRow, j + 3).Value = "No"
                 End If
-            Next i
+            Next j
             
-            iRow = iRow + 1 ' Move to the next row for the next entry
+            ' Move to the next row for the next [R] entry
+            iRow = iRow + 1
             aRng.Collapse Direction:=wdCollapseEnd
         Loop
     End With
     
-    ' Auto-fit columns for better visibility
+    ' Auto-fit Excel columns for better readability
     xlSheet.Columns.AutoFit
 End Sub
