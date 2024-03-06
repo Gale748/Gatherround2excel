@@ -1,4 +1,4 @@
-Sub ListRTagsWithSubsequentTagsAndCaptureHeadings()
+Sub ListRTagsWithSubsequentTagsAndHeadingsEnhanced()
     ' Tags to check for after [R]
     Dim subsequentTags As Variant
     subsequentTags = Array("#SPM", "#SPAM", "#TechLead", "#RSM")
@@ -20,32 +20,25 @@ Sub ListRTagsWithSubsequentTagsAndCaptureHeadings()
     ' Document setup
     Dim srcDoc As Document
     Set srcDoc = ActiveDocument
+    Dim para As Paragraph
     Dim iRow As Long: iRow = 2 ' Start from the second row for data
+    Dim lastHeadingText As String: lastHeadingText = ""
+    Dim lastHeadingPosition As Long: lastHeadingPosition = 0
+    Dim currentHeadingText As String
     
-    Dim aRng As Range, aRngHead As Range
-    Dim lastHeadingText As String, currentHeadingText As String
-    Dim lastHeadingPosition As Long
-    
-    Set aRng = srcDoc.Range
-    lastHeadingPosition = 0 ' Initialize last heading position
-    
-    With aRng.Find
-        .Text = "[R]"
-        .Forward = True
-        .Wrap = wdFindStop
-        Do While .Execute
-            aRng.Start = aRng.Paragraphs(1).Range.Start
-            
-            If aRng.Start >= lastHeadingPosition Then
-                ' Retrieve heading only if we've moved past the last heading position
-                Set aRngHead = aRng.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
-                If Not aRngHead Is Nothing Then
-                    aRngHead.End = aRngHead.Paragraphs(1).Range.End - 1
-                    currentHeadingText = Trim(aRngHead.ListFormat.ListString & " " & aRngHead.Text)
-                    
+    ' Iterate over each paragraph in the document
+    For Each para In srcDoc.Paragraphs
+        If InStr(para.Range.Text, "[R]") > 0 Then ' Check if paragraph contains [R]
+            ' Only update heading if we've moved past the last heading position
+            If para.Range.Start >= lastHeadingPosition Then
+                Dim headingRange As Range
+                Set headingRange = para.Range.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
+                If Not headingRange Is Nothing Then
+                    headingRange.End = headingRange.Paragraphs(1).Range.End - 1 ' Adjust range to exclude paragraph mark
+                    currentHeadingText = Trim(headingRange.Text)
                     If currentHeadingText <> lastHeadingText Then
                         lastHeadingText = currentHeadingText
-                        lastHeadingPosition = aRngHead.Start ' Update last heading position
+                        lastHeadingPosition = headingRange.Start ' Update last heading position
                     End If
                 Else
                     currentHeadingText = "No Heading"
@@ -53,39 +46,21 @@ Sub ListRTagsWithSubsequentTagsAndCaptureHeadings()
             End If
             
             ' Output to Excel
-            xlSheet.Cells(iRow, 1).Value = currentHeadingText
-            xlSheet.Cells(iRow, 2).Value = Trim(aRng.Text) ' Place [R] tag text
+            xlSheet.Cells(iRow, 1).Value = lastHeadingText
+            xlSheet.Cells(iRow, 2).Value = Trim(para.Range.Text) ' Place paragraph text
             
-            ' Initialize the position of [R] in the text and the text to search for subsequent tags
-            Dim posR As Long
-            Dim searchText As String
-            
-            ' Find the position of "[R]" in the paragraph text
-            posR = InStr(aRng.Text, "[R]")
-            
-            ' Extract the text after "[R]" for searching subsequent tags
-            If posR > 0 Then
-                searchText = Mid(aRng.Text, posR + Len("[R]"))
-                
-                For i = 0 To UBound(subsequentTags)
-                    ' Check if the extracted text contains each subsequent tag
-                    If InStr(searchText, subsequentTags(i)) > 0 Then
-                        xlSheet.Cells(iRow, i + 3).Value = "Yes"
-                    Else
-                        xlSheet.Cells(iRow, i + 3).Value = "No"
-                    End If
-                Next i
-            Else
-                ' If "[R]" is not found, mark as "No" for all subsequent tags
-                For i = 0 To UBound(subsequentTags)
+            ' Check for each specified subsequent tag within the same paragraph
+            For i = 0 To UBound(subsequentTags)
+                If InStr(para.Range.Text, subsequentTags(i)) > 0 Then
+                    xlSheet.Cells(iRow, i + 3).Value = "Yes"
+                Else
                     xlSheet.Cells(iRow, i + 3).Value = "No"
-                Next i
-            End If
+                End If
+            Next i
             
             iRow = iRow + 1 ' Move to the next row for the next entry
-            aRng.Collapse Direction:=wdCollapseEnd
-        Loop
-    End With
+        End If
+    Next para
     
     ' Auto-fit columns for better visibility
     xlSheet.Columns.AutoFit
