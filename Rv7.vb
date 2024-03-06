@@ -1,7 +1,10 @@
-Sub ListRTagsWithFollowingSpecificTagsAndCaptureHeadingsExactly()
-    ' Tags to check for after [R]
+Sub ListRTagsAndSubsequentTagsWithAccurateHeadingAndSpacing()
+    ' Constants for search text, tags, and column titles
+    Const SearchTextR As String = "[R]"
     Dim subsequentTags As Variant
     subsequentTags = Array("#SPM", "#SPAM", "#TechLead", "#RSM")
+    Const HeadingColumnTitle As String = "Heading"
+    Const ParagraphTextTitle As String = "Paragraph Containing [R]"
     
     ' Excel setup
     Dim xlApp As Object, xlBook As Object, xlSheet As Object
@@ -10,11 +13,11 @@ Sub ListRTagsWithFollowingSpecificTagsAndCaptureHeadingsExactly()
     Set xlSheet = xlBook.Worksheets(1)
     xlApp.Visible = True ' Make Excel visible
     
-    ' Column titles in Excel
-    xlSheet.Cells(1, 1).Value = "Heading"
-    xlSheet.Cells(1, 2).Value = "Paragraph Containing [R]"
-    For i = 0 To UBound(subsequentTags)
-        xlSheet.Cells(1, i + 3).Value = "Contains " & subsequentTags(i) & "?"
+    ' Define Excel column titles
+    xlSheet.Cells(1, 1).Value = HeadingColumnTitle
+    xlSheet.Cells(1, 2).Value = ParagraphTextTitle
+    For i = 1 To UBound(subsequentTags) + 1
+        xlSheet.Cells(1, i + 2).Value = "Contains " & subsequentTags(i - 1) & "?"
     Next i
     
     ' Document setup
@@ -22,78 +25,56 @@ Sub ListRTagsWithFollowingSpecificTagsAndCaptureHeadingsExactly()
     Set srcDoc = ActiveDocument
     Dim iRow As Long: iRow = 2 ' Start from the second row for data
     
-    Dim aRng As Range
+    ' Variables for heading tracking
     Dim currentHeadingText As String
-    Dim paragraphText As String
+    Dim lastHeadingText As String: lastHeadingText = ""
+    Dim lastHeadingPosition As Long: lastHeadingPosition = 0
     
+    Dim aRng As Range, aRngHead As Range
     Set aRng = srcDoc.Range
     
     With aRng.Find
-        .Text = "[R]"
+        .Text = SearchTextR
         .Forward = True
         .Wrap = wdFindStop
         Do While .Execute
-            ' Extend range to include the whole paragraph
-            Set aRng = aRng.Paragraphs(1).Range
+            ' Heading retrieval, exactly as in GatherRoundEnhancedToExcelOptimized
+            Set aRngHead = aRng.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
+            If Not aRngHead Is Nothing Then
+                currentHeadingText = Trim(aRngHead.Text)
+                If currentHeadingText <> lastHeadingText Then
+                    lastHeadingText = currentHeadingText
+                    lastHeadingPosition = aRngHead.Start
+                End If
+            Else
+                currentHeadingText = "No Heading"
+            End If
             
-            ' Retrieve heading text exactly as the provided script
-            currentHeadingText = GetExactHeading(aRng)
-            
-            ' Prepare paragraph text for output
-            paragraphText = Trim(aRng.Text)
-            
-            ' Output to Excel
+            ' Output the heading and paragraph text
             xlSheet.Cells(iRow, 1).Value = currentHeadingText
-            xlSheet.Cells(iRow, 2).Value = paragraphText
+            Dim fullText As String
+            fullText = aRng.Paragraphs(1).Range.Text
             
-            ' Check for each specified subsequent tag within the same paragraph
-            Dim tagText As String
-            For i = 0 To UBound(subsequentTags)
-                tagText = subsequentTags(i)
-                xlSheet.Cells(iRow, i + 3).Value = ContainsTag(aRng.Text, tagText)
+            xlSheet.Cells(iRow, 2).Value = fullText ' Full paragraph text containing [R]
+            
+            ' Improved tag detection to account for inconsistent spacing
+            For i = 1 To UBound(subsequentTags) + 1
+                ' Using pattern matching for each tag to ensure detection despite spacing
+                Dim tagPattern As String
+                tagPattern = subsequentTags(i - 1)
+                
+                If InStr(fullText, "[R]") < InStr(fullText, tagPattern) And InStr(fullText, tagPattern) > 0 Then
+                    xlSheet.Cells(iRow, i + 2).Value = "Yes"
+                Else
+                    xlSheet.Cells(iRow, i + 2).Value = "No"
+                End If
             Next i
             
-            iRow = iRow + 1 ' Move to the next row for the next entry
-            
+            iRow = iRow + 1 ' Prepare for the next row
             aRng.Collapse wdCollapseEnd
         Loop
     End With
     
-    ' Auto-fit Excel columns for better visibility
+    ' Auto-fit Excel columns for visibility
     xlSheet.Columns.AutoFit
 End Sub
-
-Function GetExactHeading(aRng As Range) As String
-    ' Retrieves the heading exactly as done in the provided script
-    Dim aRngHead As Range
-    Set aRngHead = aRng.Duplicate
-    aRngHead.Collapse wdCollapseStart
-    Set aRngHead = aRngHead.GoTo(What:=wdGoToHeading, Which:=wdGoToPrevious)
-    If Not aRngHead Is Nothing Then
-        GetExactHeading = aRngHead.ListFormat.ListString & " " & Trim(aRngHead.Text)
-    Else
-        GetExactHeading = "No Heading"
-    End If
-End Function
-
-Function ContainsTag(paragraphText As String, tag As String) As String
-    ' Checks if the specified tag is present after [R] within the paragraph
-    Dim pattern As String
-    pattern = "\[R\][^\#]*" & tag ' Regex pattern to check for tag presence after [R]
-    
-    ' Use VBScript regular expression object
-    Dim regex As Object
-    Set regex = CreateObject("VBScript.RegExp")
-    With regex
-        .Global = True
-        .MultiLine = True
-        .IgnoreCase = True
-        .pattern = pattern
-    End With
-    
-    If regex.Test(paragraphText) Then
-        ContainsTag = "Yes"
-    Else
-        ContainsTag = "No"
-    End If
-End Function
